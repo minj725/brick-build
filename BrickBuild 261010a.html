@@ -1,0 +1,1852 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0c0d10">
+<meta name="format-detection" content="telephone=no">
+<title>브릭빌드</title>
+<style>
+:root{
+  --bg:#0c0d10; --stage:#111318; --surface:#17191f; --surface2:#1f222a; --line:#2b2f38; --line2:#3a3f4a;
+  --text:#eceae5; --muted:#9097a2; --faint:#5d636e;
+  --primary:#f2efe7; --primary-ink:#121315;
+  --danger:#ff5a5f; --ok:#45d08d; --amber:#ffb84d;
+  --r:12px;
+  --font:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Malgun Gothic","Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#060708;color:var(--text);font-family:var(--font);font-size:15px;line-height:1.45;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none;touch-action:none;overflow:hidden}
+body{display:flex;justify-content:center}
+#app{position:relative;width:min(100vw,460px);height:100vh;height:100dvh;display:flex;flex-direction:column;
+  background:var(--bg);overflow:hidden;padding-top:env(safe-area-inset-top)}
+@media (min-width:520px){
+  body{background:radial-gradient(ellipse at 50% 0%,#16181d 0%,#060708 70%)}
+  #app{box-shadow:0 0 0 1px #1b1d23,0 30px 80px rgba(0,0,0,.6)}
+}
+button{font:inherit;color:inherit;margin:0;-webkit-user-select:none;user-select:none;touch-action:manipulation;cursor:pointer}
+button:focus{outline:none}
+button:focus-visible{outline:2px solid var(--muted);outline-offset:2px}
+.btn{height:44px;min-width:44px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface2);
+  color:var(--text);font-weight:650;font-size:15px;letter-spacing:-.01em;display:inline-flex;align-items:center;justify-content:center;
+  gap:6px;transition:background .15s,color .15s,border-color .15s,transform .08s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+.btn.ghost{background:transparent}
+.btn.quiet{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.risk{color:#ff9a9d}
+.btn.wide{width:100%}
+
+/* 상단 HUD */
+#hud{flex:none;display:grid;grid-template-columns:1fr auto 1fr 44px;align-items:center;gap:8px;height:52px;padding:0 4px 0 14px}
+.hud-l{font-size:13px;color:var(--muted);white-space:nowrap}
+.hud-l b{color:var(--text);font-weight:700;font-size:15px}
+.hud-r{text-align:right}
+#hudScore b{display:inline-block;font-variant-numeric:tabular-nums}
+#hudScore b.bump{animation:bump .5s ease-out}
+#hudTime{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#hudTime.warn{color:var(--danger)}
+#hudTime.urgent{animation:pulse 1s ease-in-out infinite}
+.icon-btn{width:44px;height:44px;border:0;background:transparent;border-radius:12px;display:grid;place-items:center;color:var(--muted)}
+.icon-btn:active{background:rgba(255,255,255,.06)}
+
+/* 평면도 */
+#views{flex:none;padding:0 12px 8px;cursor:pointer}
+.views-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 4px 6px}
+#viewsTotal{font-weight:750;font-size:15px;letter-spacing:-.01em}
+.views-zoom{font-size:11px;color:var(--faint)}
+.vrow{display:flex;justify-content:center;align-items:flex-end;gap:12px}
+.vrow+.vrow{margin-top:6px}
+.vcell{display:flex;flex-direction:column;align-items:center;gap:3px}
+.vcap{font-size:11px;color:var(--muted);line-height:1}
+.pic{display:grid;gap:1px;padding:1px;background:#2c3039;border-radius:3px}
+.px{background:#14161b;border-radius:1px;position:relative}
+.px.mk-mut{box-shadow:0 0 0 2px var(--danger);z-index:2;animation:markBlink .9s ease-in-out 3}
+.px.mk-diff{box-shadow:0 0 0 2px var(--amber);z-index:1}
+
+/* 3D 판 */
+#stage{position:relative;flex:1 1 auto;min-height:150px;background:var(--stage);border-top:1px solid #1a1d23;border-bottom:1px solid #1a1d23;overflow:hidden;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#camBtns{position:absolute;top:6px;right:6px;display:flex;gap:2px;padding:2px;border-radius:14px;background:rgba(12,13,16,.6);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.cam{height:44px;min-width:44px;padding:0 6px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:13px;font-weight:650}
+.cam.on{color:var(--text);background:rgba(255,255,255,.09)}
+#stageBottom{position:absolute;left:6px;right:6px;bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:6px;pointer-events:none}
+#stageBottom>*{pointer-events:auto}
+.chip-btn{height:44px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.07);background:rgba(12,13,16,.62);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:var(--text);font-size:13px;font-weight:600}
+.chip-btn:disabled{opacity:.35}
+#countPill{font-size:13px;color:var(--muted);padding:6px 11px;border-radius:999px;background:rgba(12,13,16,.62);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none}
+#countPill b{color:var(--text);font-weight:700}
+#countPill.match b{color:var(--ok)}
+#stageHint{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);font-size:12.5px;color:var(--text);background:rgba(12,13,16,.75);
+  padding:7px 12px;border-radius:999px;white-space:nowrap;pointer-events:none;animation:fade .4s ease-out}
+#toast{position:absolute;left:50%;top:56px;transform:translateX(-50%);font-size:13px;font-weight:650;color:var(--text);
+  background:rgba(12,13,16,.8);padding:8px 14px;border-radius:999px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .25s}
+#toast.show{opacity:1}
+
+/* 하단 도크 */
+#dock{flex:none;padding:10px 8px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
+#palette{display:flex;justify-content:center;gap:4px}
+.sw{flex:0 1 48px;min-width:36px;height:44px;border-radius:12px;border:0;padding:0;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);transition:box-shadow .12s,transform .08s}
+.sw:active{transform:scale(.95)}
+.sw.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text)}
+.sw-eraser{flex:0 0 auto;min-width:54px;white-space:nowrap;padding:0 10px;background:var(--surface2);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:650;box-shadow:none}
+.sw-eraser.on{background:#3a1d20;border-color:var(--danger);color:#ffd9da;box-shadow:none}
+#actions{display:grid;grid-template-columns:1fr 1fr .72fr;gap:8px;padding:0 4px}
+#resultDock{display:flex;flex-direction:column;gap:8px;padding:2px 6px 0}
+.r-line{display:flex;align-items:baseline;gap:10px}
+.r-verdict{font-size:24px;font-weight:800;letter-spacing:-.02em}
+.r-verdict.good{color:var(--ok)}
+.r-verdict.bad{color:var(--danger)}
+.r-verdict.neutral{color:var(--text)}
+.r-delta{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
+.r-truth{font-size:14px;font-weight:650}
+.r-detail{font-size:13px;color:var(--muted);line-height:1.5;min-height:1.5em}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:2px;border-radius:13px;background:var(--surface);border:1px solid var(--line)}
+.seg button{height:40px;border:0;border-radius:11px;background:transparent;color:var(--muted);font-size:13px;font-weight:650}
+.seg button.on{background:var(--surface2);color:var(--text)}
+
+/* 구석 표시 */
+#ver{position:absolute;right:10px;bottom:calc(2px + env(safe-area-inset-bottom));font-size:10px;color:var(--faint);opacity:.75;pointer-events:none;z-index:300;letter-spacing:.02em}
+#issueDot{position:absolute;left:0;top:env(safe-area-inset-top);width:36px;height:36px;border:0;background:transparent;z-index:310;padding:0}
+#issueDot::after{content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--bg)}
+
+/* 오버레이 */
+.overlay{position:absolute;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:rgba(6,7,9,.68);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:fade .16s ease-out}
+.card{width:min(100%,360px);background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.card h2{margin:0 0 6px;font-size:18px;letter-spacing:-.01em}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.card .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}
+.cf-note{margin-top:10px!important;color:var(--amber)!important;font-size:13px!important}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
+.rules{max-height:82%;display:flex;flex-direction:column}
+.rules dl{margin:4px 0 0;display:grid;grid-template-columns:auto 1fr;gap:10px 12px;font-size:13.5px}
+.rules dt{color:var(--text);font-weight:700;white-space:nowrap}
+.rules dd{margin:0;color:var(--muted)}
+.rules .btn{margin-top:16px;flex:none}
+
+/* 설정 팝업 */
+#settings{position:absolute;inset:0;z-index:150}
+.pop{position:absolute;right:8px;top:calc(50px + env(safe-area-inset-top));width:236px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.55);animation:fade .14s ease-out}
+.pop button{display:flex;align-items:center;width:100%;height:44px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--text);font-size:14px;text-align:left}
+.pop button:active{background:var(--surface2)}
+.pop button.armed{color:var(--danger);background:rgba(255,90,95,.08)}
+.pop hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+
+/* 크게 보기 */
+.big{width:min(100%,380px)}
+.big-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.big-head b{font-size:16px}
+.big-head span{font-size:12px;color:var(--muted)}
+.big-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:14px}
+.big-tabs button{height:44px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px;font-weight:650;padding:0}
+.big-tabs button.on{background:var(--surface2);color:var(--text);border-color:var(--line2)}
+.big-body{display:grid;grid-template-columns:auto auto auto;grid-template-rows:auto auto auto;justify-content:center;align-items:center;gap:6px;min-height:200px}
+.big-axis{font-size:12px;color:var(--muted);text-align:center}
+.big-floors{display:grid;align-content:stretch;font-size:11px;color:var(--faint);text-align:right}
+.big-floors span{display:flex;align-items:center;justify-content:flex-end}
+.big-under{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px}
+.big-legend{margin-top:12px;font-size:12px;color:var(--muted);display:flex;gap:14px;justify-content:center}
+.big-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+/* 시작/결과 화면 */
+.screen{position:absolute;inset:0;z-index:120;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(26px + env(safe-area-inset-top)) 22px calc(26px + env(safe-area-inset-bottom))}
+.st-gear{position:absolute;right:8px;top:calc(6px + env(safe-area-inset-top))}
+.st-hero{display:flex;flex-direction:column;align-items:center;text-align:center;margin:8px 0 22px}
+#logo svg{display:block;width:96px;height:auto}
+.st-title{margin:14px 0 2px;font-size:34px;font-weight:850;letter-spacing:-.03em}
+.st-sub{font-size:11px;letter-spacing:.32em;color:var(--faint);font-weight:700}
+.st-pitch{margin-top:12px;font-size:14px;color:var(--muted);max-width:290px}
+.diffs{display:flex;flex-direction:column;gap:8px}
+.diff{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:6px;min-height:58px;padding:8px 14px;border-radius:14px;
+  border:1px solid var(--line);background:var(--surface);text-align:left;transition:border-color .15s,background .15s}
+.diff.on{border-color:var(--text);background:var(--surface2)}
+.diff .dn{font-weight:750;font-size:16px}
+.diff .ds{font-size:12.5px;color:var(--muted)}
+.diff .db{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.diff.on .db{color:var(--text)}
+.st-score{display:flex;justify-content:center;gap:16px;margin:18px 0 0;font-size:12px;color:var(--muted)}
+.st-score b{color:var(--text);font-weight:650}
+.st-actions{margin-top:auto;padding-top:18px;display:flex;flex-direction:column;gap:6px}
+.fin{display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:18px}
+.fin-kicker{font-size:12px;letter-spacing:.06em;color:var(--faint);font-weight:700}
+.fin-score{font-size:68px;font-weight:850;letter-spacing:-.04em;line-height:1.05;margin-top:10px;font-variant-numeric:tabular-nums}
+.fin-time{font-size:14px;color:var(--muted)}
+.fin-best{margin-top:12px;font-size:13px;color:var(--muted);min-height:28px;display:flex;align-items:center}
+.fin-best .new{color:var(--primary-ink);background:var(--primary);font-weight:750;padding:5px 12px;border-radius:999px;animation:pop .5s ease-out}
+.fin-rounds{width:100%;margin-top:18px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.fr{display:grid;grid-template-columns:28px 1fr auto 48px;align-items:center;gap:8px;padding:10px 14px;font-size:13px;border-top:1px solid var(--line)}
+.fr:first-child{border-top:0}
+.fr .n{color:var(--faint);font-variant-numeric:tabular-nums}
+.fr .w{color:var(--muted);text-align:left}
+.fr .t{color:var(--faint);font-variant-numeric:tabular-nums}
+.fr .d{text-align:right;font-weight:750;font-variant-numeric:tabular-nums}
+.fr .d.pos{color:var(--ok)} .fr .d.neg{color:var(--danger)} .fr .d.zero{color:var(--muted)}
+.seed{position:absolute;left:12px;bottom:calc(4px + env(safe-area-inset-bottom));font-size:9px;color:var(--faint);opacity:.6;letter-spacing:.04em;pointer-events:none}
+.offline{align-items:center;justify-content:center;text-align:center;gap:10px}
+.offline .ic{font-size:40px;line-height:1}
+.offline h2{margin:6px 0 0;font-size:20px}
+.offline p{margin:0;color:var(--muted);font-size:14px;max-width:280px}
+.offline .btn{margin-top:14px;min-width:160px}
+.issues ul{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);max-height:50vh;overflow:auto}
+.issues li{margin:4px 0;word-break:break-all}
+
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes bump{0%{transform:scale(1)}30%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+@keyframes markBlink{0%,100%{box-shadow:0 0 0 2px var(--danger)}50%{box-shadow:0 0 0 3px rgba(255,90,95,.35)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-height:640px){
+  #hud{height:46px}
+  .st-hero{margin:0 0 12px}
+  #logo svg{width:70px}
+  .st-title{font-size:28px;margin-top:8px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="hud-l" id="hudRound">라운드 <b>1</b>/5</div>
+    <div id="hudTime">0:00</div>
+    <div class="hud-l hud-r" id="hudScore">점수 <b>0</b></div>
+    <button class="icon-btn" id="btnGear" aria-label="설정" title="설정">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <section id="views" aria-label="평면도 (탭하면 크게 보기)">
+    <div class="views-head"><span id="viewsTotal">총 0개</span><span class="views-zoom">탭해서 크게 ⤢</span></div>
+    <div class="vrow">
+      <div class="vcell" data-dir="F"><div id="vF"></div><div class="vcap">앞</div></div>
+      <div class="vcell" data-dir="T"><div id="vT"></div><div class="vcap">위</div></div>
+      <div class="vcell" data-dir="B"><div id="vB"></div><div class="vcap">뒤</div></div>
+    </div>
+    <div class="vrow">
+      <div class="vcell" data-dir="L"><div id="vL"></div><div class="vcap">왼쪽</div></div>
+      <div class="vcell" data-dir="R"><div id="vR"></div><div class="vcap">오른쪽</div></div>
+    </div>
+  </section>
+
+  <section id="stage">
+    <canvas id="cv"></canvas>
+    <div id="camBtns" role="group" aria-label="시점">
+      <button class="cam" data-preset="front" title="앞에서 보기">앞</button>
+      <button class="cam" data-preset="top" title="위에서 보기">위</button>
+      <button class="cam" data-preset="back" title="뒤에서 보기">뒤</button>
+      <button class="cam" data-preset="left" title="왼쪽에서 보기">왼</button>
+      <button class="cam" data-preset="right" title="오른쪽에서 보기">오른</button>
+    </div>
+    <div id="stageBottom">
+      <button class="chip-btn" id="btnUndo" title="되돌리기 (Z)">되돌리기</button>
+      <div id="countPill">현재 <b>0</b>개 / 총 0개</div>
+      <button class="chip-btn" id="btnClear" title="전체 비우기">비우기</button>
+    </div>
+    <div id="stageHint" hidden>칸을 탭하면 쌓이고 · 드래그하면 돌아가요</div>
+    <div id="toast"></div>
+  </section>
+
+  <section id="dock">
+    <div id="playDock" style="display:flex;flex-direction:column;gap:10px">
+      <div id="palette" role="group" aria-label="색 고르기"></div>
+      <div id="actions">
+        <button class="btn" id="btnBuild">정답</button>
+        <button class="btn risk" id="btnImpossible">불가능</button>
+        <button class="btn ghost" id="btnGiveup">포기</button>
+      </div>
+    </div>
+    <div id="resultDock" hidden>
+      <div class="r-line"><span class="r-verdict" id="rVerdict"></span><span class="r-delta" id="rDelta"></span></div>
+      <div class="r-truth" id="rTruth"></div>
+      <div class="r-detail" id="rDetail"></div>
+      <div class="seg" id="rSeg"><button data-show="answer">정답 모형</button><button data-show="mine">내 모형</button></div>
+      <button class="btn primary wide" id="btnNext">다음 라운드</button>
+    </div>
+  </section>
+
+  <!-- 시작 화면 -->
+  <div id="startScreen" class="screen scroll">
+    <button class="icon-btn st-gear" id="btnGear2" aria-label="설정" title="설정">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <div class="st-hero">
+      <div id="logo" aria-hidden="true"></div>
+      <div class="st-title">브릭빌드</div>
+      <div class="st-sub">BRICK BUILD · 5 ROUNDS</div>
+      <div class="st-pitch">다섯 장의 그림과 개수에 딱 맞게 쌓으세요.<br>만들 수 없으면 "불가능"을 외치면 돼요.</div>
+    </div>
+    <div class="diffs" id="diffList" role="radiogroup" aria-label="난이도"></div>
+    <div class="st-score"><span>정답 <b>+1 / −1</b></span><span>불가능 <b>+2 / −2</b></span><span>포기 <b>0</b></span></div>
+    <div class="st-actions">
+      <button class="btn primary wide" id="btnStart" disabled>불러오는 중…</button>
+      <button class="btn quiet wide" id="btnRules">규칙 자세히</button>
+    </div>
+  </div>
+
+  <!-- 최종 결과 -->
+  <div id="finalScreen" class="screen scroll" hidden>
+    <div class="fin">
+      <div class="fin-kicker" id="fDiff"></div>
+      <div class="fin-score" id="fScore">0</div>
+      <div class="fin-time" id="fTime"></div>
+      <div class="fin-best" id="fBest"></div>
+      <div class="fin-rounds" id="fRounds"></div>
+    </div>
+    <div class="st-actions">
+      <button class="btn primary wide" id="btnAgain">다시 하기</button>
+      <button class="btn quiet wide" id="btnToMenu">난이도 바꾸기</button>
+    </div>
+    <div class="seed" id="fSeed"></div>
+  </div>
+
+  <!-- 인터넷 연결 안내 -->
+  <div id="offline" class="screen offline" hidden>
+    <div class="ic" aria-hidden="true">📡</div>
+    <h2 id="offTitle">인터넷 연결을 확인하세요</h2>
+    <p id="offBody">3D 화면을 불러오지 못했어요.<br>인터넷에 연결한 뒤 다시 시도해 주세요.</p>
+    <button class="btn primary" id="btnRetry">다시 시도</button>
+  </div>
+
+  <!-- 선언 확인 -->
+  <div id="confirm" class="overlay" hidden>
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+      <h2 id="cfTitle"></h2>
+      <p id="cfSub"></p>
+      <p id="cfNote" class="cf-note" hidden></p>
+      <div class="row"><button class="btn" id="btnCfCancel">취소</button><button class="btn primary" id="btnCfOk">선언</button></div>
+    </div>
+  </div>
+
+  <!-- 일시정지 -->
+  <div id="pause" class="overlay" hidden>
+    <div class="card" style="text-align:center">
+      <h2>일시정지</h2>
+      <p>화면을 벗어나서 시간을 멈췄어요.</p>
+      <div style="margin-top:18px"><button class="btn primary wide" id="btnResume">계속하기</button></div>
+    </div>
+  </div>
+
+  <!-- 평면도 크게 보기 -->
+  <div id="bigView" class="overlay" hidden>
+    <div class="card big" role="dialog" aria-modal="true">
+      <div class="big-head"><b id="bigTitle"></b><span id="bigTotal"></span></div>
+      <div class="big-tabs" id="bigTabs">
+        <button data-dir="F">앞</button><button data-dir="T">위</button><button data-dir="B">뒤</button><button data-dir="L">왼쪽</button><button data-dir="R">오른쪽</button>
+      </div>
+      <div class="big-body" id="bigBody"></div>
+      <div class="big-legend" id="bigLegend" hidden></div>
+      <div style="margin-top:14px"><button class="btn wide" id="btnBigClose">닫기</button></div>
+    </div>
+  </div>
+
+  <!-- 규칙 -->
+  <div id="rules" class="overlay" hidden>
+    <div class="card rules">
+      <h2>규칙</h2>
+      <div class="scroll" style="flex:1 1 auto;min-height:0">
+        <dl>
+          <dt>목표</dt><dd>다섯 방향 그림(앞·위·뒤·왼쪽·오른쪽)과 총 개수를 <b style="color:var(--text)">모두</b> 만족하게 쌓아요. 하나라도 다르면 오답이에요.</dd>
+          <dt>그림</dt><dd>그 방향에서 봤을 때 맨 앞에 보이는 블록의 색이에요. 옆 그림은 맨 아랫줄이 1층, 위 그림은 윗줄이 뒤쪽이에요. 그림을 탭하면 방향 표시와 함께 크게 보여요.</dd>
+          <dt>불가능</dt><dd>어떻게 쌓아도 못 만들면 "불가능"을 선언해요. 그림끼리 모양이 안 맞거나, 색이 안 맞거나, 개수가 안 맞는 경우가 있어요.</dd>
+          <dt>점수</dt><dd>정답 +1 / −1, 불가능 +2 / −2, 포기·시간 초과 0점. 선언은 라운드마다 한 번뿐이에요. 동점이면 더 빨리 끝낸 기록이 앞서요.</dd>
+          <dt>조작</dt><dd>칸 탭 = 쌓기 · 드래그 = 돌리기 · 두 손가락/휠 = 확대 · 지우개로 탭하면 맨 위 블록을 빼요.</dd>
+          <dt>키보드</dt><dd>1~6 색 · E 지우개 · Z 되돌리기</dd>
+        </dl>
+      </div>
+      <button class="btn wide" id="btnRulesClose">닫기</button>
+    </div>
+  </div>
+
+  <!-- 설정 -->
+  <div id="settings" hidden>
+    <div class="pop" role="menu">
+      <button id="setRules">규칙 보기</button>
+      <button id="setQuit">그만두고 처음으로</button>
+      <hr>
+      <button id="setReset">최고 기록 지우기</button>
+    </div>
+  </div>
+
+  <!-- 자가 테스트 실패/오류 목록 -->
+  <div id="issues" class="overlay" hidden>
+    <div class="card issues">
+      <h2>문제가 발견됐어요</h2>
+      <p>아래 내용을 개발자에게 알려 주세요.</p>
+      <ul id="issueList"></ul>
+      <div style="margin-top:14px"><button class="btn wide" id="btnIssuesClose">닫기</button></div>
+    </div>
+  </div>
+
+  <button id="issueDot" hidden aria-label="문제 목록 보기"></button>
+  <div id="ver">v0.1 · 빌드 261010a</div>
+</div>
+
+<!-- 솔버 (brickbuild_solver.js 원문 그대로, module.exports 줄만 제거) -->
+<script>
+'use strict';
+// 브릭빌드 솔버 + 문제 생성기 (벤치마크용 프로토타입)
+// 좌표: x = 왼→오(앞에서 봤을 때), z = 앞→뒤, y = 아래→위
+// 모델: 기둥 높이 h[x*N+z] (0..H), 색 col[i][y]
+// 평면도: T[i] (위), F/B[x][y], L/R[z][y]  — 값은 색 번호(0..C-1) 또는 -1(빈칸)
+
+function makeGame(N, H, C) {
+  const NN = N * N;
+  const id = (x, z) => x * N + z;
+  const rand = (n) => Math.floor(Math.random() * n);
+
+  // 각 방향의 시선(ray): 그 방향에서 가까운 칸부터 순서대로
+  const rays = [];
+  for (let x = 0; x < N; x++) {
+    rays.push({ d: 'F', line: x, cells: [...Array(N)].map((_, z) => id(x, z)) });
+    rays.push({ d: 'B', line: x, cells: [...Array(N)].map((_, z) => id(x, N - 1 - z)) });
+  }
+  for (let z = 0; z < N; z++) {
+    rays.push({ d: 'L', line: z, cells: [...Array(N)].map((_, x) => id(x, z)) });
+    rays.push({ d: 'R', line: z, cells: [...Array(N)].map((_, x) => id(N - 1 - x, z)) });
+  }
+
+  // 정의 그 자체: 모형 → 평면도
+  function computeViews(h, col) {
+    const V = { T: new Array(NN).fill(-1), F: [], B: [], L: [], R: [] };
+    for (let i = 0; i < NN; i++) if (h[i] > 0) V.T[i] = col[i][h[i] - 1];
+    for (const r of rays) {
+      const arr = [];
+      for (let y = 0; y < H; y++) {
+        let c = -1;
+        for (const cell of r.cells) if (h[cell] > y) { c = col[cell][y]; break; }
+        arr.push(c);
+      }
+      V[r.d][r.line] = arr;
+    }
+    return V;
+  }
+
+  function randModel(K) {
+    const h = new Array(NN).fill(0);
+    let s = 0;
+    while (s < K) { const i = rand(NN); if (h[i] < H) { h[i]++; s++; } }
+    const col = [...Array(NN)].map(() => [...Array(H)].map(() => rand(C)));
+    return { h, col };
+  }
+
+  // 평면도에서 각 기둥의 높이 후보 계산 (중력 위반이면 null)
+  function prepare(V) {
+    const sil = {};
+    for (const d of ['F', 'B', 'L', 'R']) {
+      sil[d] = [];
+      for (let l = 0; l < N; l++) {
+        const a = V[d][l]; let s = 0;
+        for (let y = 0; y < H; y++) if (a[y] !== -1) { if (s !== y) return null; s++; }
+        sil[d].push(s);
+      }
+    }
+    for (let l = 0; l < N; l++) if (sil.F[l] !== sil.B[l] || sil.L[l] !== sil.R[l]) return null;
+    const dom = new Array(NN);
+    for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
+      const i = id(x, z), cap = Math.min(sil.F[x], sil.L[z]);
+      if (V.T[i] === -1) dom[i] = [0];
+      else { if (cap < 1) return null; dom[i] = []; for (let v = 1; v <= cap; v++) dom[i].push(v); }
+    }
+    return dom;
+  }
+
+  // mode: 'any' | 'count' | 'min' | 'max'
+  function solve(V, mode, K, limit = 5e6) {
+    const dom = prepare(V);
+    if (!dom) return { found: false, best: null, nodes: 0, aborted: false };
+    const domMax = dom.map(d => d[d.length - 1]);
+    const order = [];
+    for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) order.push(id(x, z));
+    const sufMin = new Array(NN + 1).fill(0), sufMax = new Array(NN + 1).fill(0);
+    for (let k = NN - 1; k >= 0; k--) {
+      sufMin[k] = sufMin[k + 1] + dom[order[k]][0];
+      sufMax[k] = sufMax[k + 1] + domMax[order[k]];
+    }
+    const h = new Int8Array(NN).fill(-1);
+    const req = new Int8Array(NN * H);
+
+    function check() {
+      req.fill(-1);
+      for (let i = 0; i < NN; i++) { const hv = h[i]; if (hv > 0) req[i * H + hv - 1] = V.T[i]; }
+      for (const r of rays) {
+        const want = V[r.d][r.line];
+        for (let y = 0; y < H; y++) {
+          let hit = -1, und = false;
+          for (const cell of r.cells) {
+            const hv = h[cell];
+            if (hv < 0) { if (domMax[cell] > y) { und = true; break; } continue; }
+            if (hv > y) { hit = cell; break; }
+          }
+          if (und) continue;
+          const w = want[y];
+          if (hit < 0) { if (w !== -1) return false; }
+          else {
+            if (w === -1) return false;
+            const k = hit * H + y;
+            if (req[k] === -1) req[k] = w; else if (req[k] !== w) return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    let nodes = 0, found = false, aborted = false, sol = null;
+    let best = mode === 'min' ? Infinity : -Infinity;
+    function dfs(k, sum) {
+      if (++nodes > limit) { aborted = true; return; }
+      if (k === NN) {
+        if (mode === 'any' || mode === 'count') { found = true; sol = Array.from(h); return; }
+        if (mode === 'min' ? sum < best : sum > best) best = sum;
+        return;
+      }
+      const i = order[k];
+      const vals = mode === 'max' ? [...dom[i]].reverse() : dom[i];
+      for (const v of vals) {
+        const ns = sum + v;
+        if (mode === 'count' && (ns + sufMin[k + 1] > K || ns + sufMax[k + 1] < K)) continue;
+        if (mode === 'min' && ns + sufMin[k + 1] >= best) continue;
+        if (mode === 'max' && ns + sufMax[k + 1] <= best) continue;
+        h[i] = v;
+        if (check()) dfs(k + 1, ns);
+        h[i] = -1;
+        if (found || aborted) return;
+      }
+    }
+    dfs(0, 0);
+    const ok = mode === 'min' || mode === 'max' ? isFinite(best) : found;
+    return { found: ok, best: isFinite(best) ? best : null, nodes, aborted, sol };
+  }
+
+  function otherColor(c) { let n; do n = rand(C); while (n === c); return n; }
+  function mutate(V) {
+    const W = JSON.parse(JSON.stringify(V));
+    const d = ['T', 'F', 'B', 'L', 'R'][rand(5)];
+    const flip = (c) => c === -1 ? rand(C) : (Math.random() < 0.5 ? -1 : otherColor(c));
+    if (d === 'T') { const i = rand(NN); W.T[i] = flip(W.T[i]); }
+    else { const l = rand(N), y = rand(H); W[d][l][y] = flip(W[d][l][y]); }
+    return W;
+  }
+
+  return { N, H, C, NN, id, rays, computeViews, randModel, prepare, solve, mutate, rand };
+}
+</script>
+
+<!-- 출제·판정 로직 (화면과 무관한 순수 함수) -->
+<script>
+var BrickLogic = (function () {
+  'use strict';
+  const LIMIT = 2e5;
+  const COLORS = [
+    { name: '빨강', hex: '#e5484d', ch: 'R' },
+    { name: '노랑', hex: '#f5c63c', ch: 'Y' },
+    { name: '파랑', hex: '#3d7fe6', ch: 'B' },
+    { name: '보라', hex: '#9b5de5', ch: 'P' },
+    { name: '초록', hex: '#2fa557', ch: 'G' },
+    { name: '민트', hex: '#62e0c9', ch: 'M' },
+  ];
+  const DIFFS = {
+    easy:   { key: 'easy',   label: '쉬움', N: 3, H: 3, C: 3, kMin: 9,  kMax: 13, timeSec: 120 },
+    normal: { key: 'normal', label: '보통', N: 4, H: 3, C: 4, kMin: 16, kMax: 22, timeSec: 180 },
+    orig:   { key: 'orig',   label: '원작', N: 5, H: 3, C: 6, kMin: 25, kMax: 35, timeSec: 300 },
+  };
+  const KINDS = ['shape', 'color', 'count'];
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newSeed() {
+    try { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] >>> 0; }
+    catch (e) { return (Date.now() ^ Math.floor(Math.random() * 4294967296)) >>> 0; }
+  }
+  // 솔버 내부(randModel, mutate)는 Math.random을 쓴다. 솔버를 고치지 않고
+  // 시드 난수를 쓰게 하려고, 출제하는 동안만 Math.random을 잠깐 바꿔 끼운다(동기 처리라 안전).
+  function withRandom(rng, fn) {
+    const orig = Math.random;
+    Math.random = rng;
+    try { return fn(); } finally { Math.random = orig; }
+  }
+  const uniform = (rng, a, b) => a + (b - a) * rng();
+  const randInt = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
+
+  // 게임 시작 때 한 번: 판의 "성격"
+  function drawCharacter(dk, rng) {
+    if (dk === 'easy') return { pBase: uniform(rng, 0.25, 0.35), noise: 0.05, weights: [0.70, 0.20, 0.10] };
+    if (dk === 'normal') return { pBase: uniform(rng, 0.10, 0.40), noise: 0.15, weights: [0.40, 0.30, 0.30] };
+    const a = [rng(), rng(), rng()], s = a[0] + a[1] + a[2];
+    const w = s > 0 ? a.map(v => 0.05 + 0.85 * v / s) : [1 / 3, 1 / 3, 1 / 3]; // 각 최소 5%, 합 1
+    return { pBase: uniform(rng, 0, 0.45), noise: 0.20, weights: w };
+  }
+  function impossibleProb(dk, ch, i, rng) {
+    const p = ch.pBase + uniform(rng, -ch.noise, ch.noise) + (dk === 'orig' ? 0.02 * i : 0);
+    return Math.min(0.45, Math.max(0, p));
+  }
+  function kindWeights(dk, ch, i) {
+    const w = ch.weights.slice();
+    if (dk !== 'easy') { w[1] *= 1 + 0.15 * i; w[2] *= 1 + 0.15 * i; }
+    const s = w[0] + w[1] + w[2];
+    return w.map(v => v / s);
+  }
+  function pickKind(w, tried, rng) {
+    let tot = 0;
+    for (let k = 0; k < 3; k++) if (!tried.has(KINDS[k])) tot += w[k];
+    if (tot <= 0) return null;
+    let r = rng() * tot;
+    for (let k = 0; k < 3; k++) {
+      if (tried.has(KINDS[k])) continue;
+      r -= w[k];
+      if (r < 0) return KINDS[k];
+    }
+    for (let k = 2; k >= 0; k--) if (!tried.has(KINDS[k])) return KINDS[k];
+    return null;
+  }
+  function countGap(dk, rng) {
+    if (dk === 'easy') return 2;
+    if (dk === 'normal') return rng() < 0.5 ? 1 : 2;
+    return rng() < 0.8 ? 1 : 2;
+  }
+
+  function viewDiffKeys(G, A, B) {
+    const keys = [];
+    for (let i = 0; i < G.NN; i++) if (A.T[i] !== B.T[i]) keys.push('T:' + i);
+    for (const d of ['F', 'B', 'L', 'R'])
+      for (let l = 0; l < G.N; l++)
+        for (let y = 0; y < G.H; y++) if (A[d][l][y] !== B[d][l][y]) keys.push(d + ':' + l + ':' + y);
+    return keys;
+  }
+  function countBlocks(h) { let s = 0; for (const v of h) s += v; return s; }
+
+  // 가능 문제: randModel → computeViews → solve(count) 확인
+  function makePossible(G, D, rng) {
+    for (let t = 0; t < 500; t++) {
+      const K = randInt(rng, D.kMin, D.kMax);
+      const m = G.randModel(K);
+      const V = G.computeViews(m.h, m.col);
+      const s = G.solve(V, 'count', K, LIMIT);
+      if (s.aborted || !s.found) continue;
+      return { kind: 'possible', possible: true, V, K, model: m };
+    }
+    return null;
+  }
+  // 불가능 문제 한 번 시도 (실패하면 null)
+  function makeImpossible(G, D, dk, kind, rng) {
+    const base = makePossible(G, D, rng);
+    if (!base) return null;
+    if (kind === 'shape' || kind === 'color') {
+      const W = G.mutate(base.V);
+      const dom = G.prepare(W);
+      if (kind === 'shape') {
+        if (dom !== null) return null;
+      } else {
+        if (dom === null) return null;
+        const s = G.solve(W, 'any', undefined, LIMIT);
+        if (s.aborted || s.found) return null; // 여전히 가능(약 8%)하거나 판정 불가면 버림
+      }
+      const k0 = viewDiffKeys(G, base.V, W);
+      return { kind, possible: false, V: W, K: base.K, mark: k0.length ? k0[0] : null };
+    }
+    // 개수 불가능
+    const mn = G.solve(base.V, 'min', undefined, LIMIT);
+    const mx = G.solve(base.V, 'max', undefined, LIMIT);
+    if (mn.aborted || mx.aborted || mn.best == null || mx.best == null) return null;
+    const gap = countGap(dk, rng), cap = G.NN * G.H;
+    const opts = [];
+    if (mn.best - gap >= 1) opts.push(mn.best - gap);
+    if (mx.best + gap <= cap) opts.push(mx.best + gap);
+    if (!opts.length) return null;
+    const K = opts.length === 1 ? opts[0] : (rng() < 0.5 ? opts[0] : opts[1]);
+    const s = G.solve(base.V, 'count', K, LIMIT);
+    if (s.aborted || s.found) return null;
+    return { kind: 'count', possible: false, V: base.V, K, range: [mn.best, mx.best] };
+  }
+  // 최종 관문: 내기 직전에 다시 한 번 솔버로 확인
+  function verifyProblem(G, pr) {
+    if (!pr) return false;
+    const s = G.solve(pr.V, 'count', pr.K, LIMIT);
+    if (s.aborted) return false;
+    return pr.possible ? s.found === true : s.found === false;
+  }
+  // 라운드 i(0~4)의 문제. 호출하는 쪽에서 withRandom(rng, ...)으로 감싼다.
+  function generateRound(G, D, dk, ch, i, rng) {
+    const p = impossibleProb(dk, ch, i, rng);
+    const wantImpossible = rng() < p;
+    let pr = null;
+    if (wantImpossible) {
+      const w = kindWeights(dk, ch, i), tried = new Set();
+      while (!pr) {
+        const kind = pickKind(w, tried, rng);
+        if (!kind) break;
+        for (let a = 0; a < 30 && !pr; a++) {
+          const c = makeImpossible(G, D, dk, kind, rng);
+          if (c && verifyProblem(G, c)) pr = c;
+        }
+        tried.add(kind);
+      }
+    }
+    for (let t = 0; !pr && t < 50; t++) {
+      const c = makePossible(G, D, rng);
+      if (c && verifyProblem(G, c)) pr = c;
+    }
+    if (!pr) throw new Error('문제를 만들지 못했어요');
+    pr.round = i;
+    return pr;
+  }
+
+  // 평면도 → 그림 칸 배열 (화면 그리기와 자가 테스트가 함께 쓰는 유일한 경로)
+  // 반환: 위쪽 줄부터, 각 줄은 왼쪽 열부터. 칸 = { c: 색 번호(-1=빈칸), key: 솔버 주소 }
+  function viewGrid(G, V, d) {
+    const N = G.N, H = G.H, rows = [];
+    if (d === 'T') {
+      for (let r = 0; r < N; r++) {
+        const z = N - 1 - r, row = [];               // 맨 윗줄 = 뒤(z=N-1)
+        for (let x = 0; x < N; x++) { const i = G.id(x, z); row.push({ c: V.T[i], key: 'T:' + i }); }
+        rows.push(row);
+      }
+      return rows;
+    }
+    // 앞 j열 = F[j], 뒤 j열 = B[N-1-j], 왼쪽 j열 = L[N-1-j], 오른쪽 j열 = R[j]
+    const lineOf = (j) => (d === 'F' || d === 'R') ? j : N - 1 - j;
+    for (let r = 0; r < H; r++) {
+      const y = H - 1 - r, row = [];                  // 위쪽 줄 = 높은 층
+      for (let j = 0; j < N; j++) { const l = lineOf(j); row.push({ c: V[d][l][y], key: d + ':' + l + ':' + y }); }
+      rows.push(row);
+    }
+    return rows;
+  }
+  function gridToString(rows) {
+    return rows.map(r => r.map(cell => cell.c < 0 ? '.' : COLORS[cell.c].ch).join(' ')).join('\n');
+  }
+
+  // 판정: 숨은 모형이 아니라 "평면도 5장 + 개수"가 모두 맞는지
+  function judge(G, pr, declared, model) {
+    if (declared === 'impossible') { const ok = !pr.possible; return { correct: ok, delta: ok ? 2 : -2 }; }
+    const count = countBlocks(model.h);
+    if (!pr.possible) return { correct: false, delta: -1, count, diff: [] };
+    const PV = G.computeViews(model.h, model.col);
+    const diff = viewDiffKeys(G, PV, pr.V);
+    const ok = count === pr.K && diff.length === 0;
+    return { correct: ok, delta: ok ? 1 : -1, count, diff };
+  }
+
+  // 자가 테스트 1~3 (방향 테스트 벡터)
+  function selfTestCore() {
+    const fails = [];
+    try {
+      const G = makeGame(3, 3, 4);
+      const h = new Array(9).fill(0), col = [...Array(9)].map(() => [-1, -1, -1]);
+      const spec = [[0, 0, [0, 1]], [0, 1, [3]], [0, 2, []], [1, 0, [2, 3, 0]], [1, 1, [1, 2]], [1, 2, [0]], [2, 0, [0]], [2, 1, []], [2, 2, [2, 3]]];
+      for (const [x, z, cs] of spec) { const i = G.id(x, z); h[i] = cs.length; cs.forEach((c, y) => { col[i][y] = c; }); }
+      const V = G.computeViews(h, col);
+      const exp = {
+        F: '. R .\nY P P\nR B R', B: '. R .\nP B Y\nB R P', L: '. . R\nP B Y\nR P R',
+        R: 'R . .\nP B P\nR Y B', T: '. R P\nP B .\nY R R',
+      };
+      const NAME = { F: '앞', B: '뒤', L: '왼쪽', R: '오른쪽', T: '위' };
+      for (const d of ['F', 'T', 'B', 'L', 'R']) {
+        const got = gridToString(viewGrid(G, V, d));
+        if (got !== exp[d]) fails.push(`테스트1 ${NAME[d]} 그림 불일치: ${got.replace(/\n/g, ' / ')} (기대 ${exp[d].replace(/\n/g, ' / ')})`);
+      }
+      if (countBlocks(h) !== 12) fails.push('테스트 모형 블록 수가 12가 아님');
+      const c = G.solve(V, 'count', 12, LIMIT);
+      if (!c.found || c.aborted) fails.push(`테스트2 solve(count,12) 실패 (found=${c.found}, aborted=${c.aborted})`);
+      const mn = G.solve(V, 'min', undefined, LIMIT), mx = G.solve(V, 'max', undefined, LIMIT);
+      if (!(mn.best != null && mx.best != null && mn.best <= 12 && 12 <= mx.best))
+        fails.push(`테스트3 범위 오류: min=${mn.best}, max=${mx.best}`);
+    } catch (e) {
+      fails.push('테스트1~3 실행 오류: ' + (e && e.message));
+    }
+    return fails;
+  }
+
+  return {
+    LIMIT, COLORS, DIFFS, KINDS, mulberry32, newSeed, withRandom, drawCharacter, impossibleProb, kindWeights,
+    makePossible, makeImpossible, verifyProblem, generateRound, viewGrid, gridToString, viewDiffKeys,
+    countBlocks, judge, selfTestCore,
+  };
+})();
+</script>
+
+<!-- 화면·3D·게임 진행 -->
+<script>
+(function () {
+  'use strict';
+  const L = BrickLogic;
+  const THREE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js';
+  const LS_BEST = 'brickbuild.best.v1', LS_HINT = 'brickbuild.hint.v1', LS_DIFF = 'brickbuild.diff.v1';
+  const ROUNDS = 5;
+  const COLORS = L.COLORS, DIFFS = L.DIFFS, DIFF_ORDER = ['easy', 'normal', 'orig'];
+  const DIR_NAME = { F: '앞', T: '위', B: '뒤', L: '왼쪽', R: '오른쪽' };
+  const DIR_AXES = { F: ['왼쪽', '오른쪽'], B: ['오른쪽', '왼쪽'], L: ['뒤', '앞'], R: ['앞', '뒤'], T: ['왼쪽', '오른쪽'] };
+  const SIDE_PHI = 1.3;               // 옆 시점: 살짝 위에서
+  const PRESETS = {                   // 4-4 표와 같은 카메라(구면좌표로 표현)
+    front: { label: '앞',   theta: 0,            phi: SIDE_PHI },
+    top:   { label: '위',   theta: 0,            phi: 0 },
+    back:  { label: '뒤',   theta: Math.PI,      phi: SIDE_PHI },
+    left:  { label: '왼쪽', theta: -Math.PI / 2, phi: SIDE_PHI },
+    right: { label: '오른쪽', theta: Math.PI / 2, phi: SIDE_PHI },
+  };
+  const DEFAULT_CAM = { theta: 0.55, phi: 0.98 };
+
+  const $ = (id) => document.getElementById(id);
+  let THREE = null;
+
+  // ---------- 문제 알림 (자가 테스트 실패·실행 오류) ----------
+  const issues = [];
+  function reportIssue(msg) {
+    msg = String(msg);
+    if (issues.indexOf(msg) >= 0 || issues.length >= 30) return;
+    issues.push(msg);
+    const dot = $('issueDot');
+    if (dot) dot.hidden = false;
+    const ul = $('issueList');
+    if (ul) { const li = document.createElement('li'); li.textContent = msg; ul.appendChild(li); }
+  }
+  function safe(fn) {
+    return function () {
+      try { return fn.apply(this, arguments); }
+      catch (e) { reportIssue('오류: ' + (e && e.message ? e.message : e)); }
+    };
+  }
+  function on(el, ev, fn, opt) { if (el) el.addEventListener(ev, safe(fn), opt); }
+
+  // ---------- 기기 저장 ----------
+  function lsGet(k, fb) {
+    try { const v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch (e) { return fb; }
+  }
+  function lsSet(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; }
+  }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { /* 무시 */ } }
+
+  // ---------- 상태 ----------
+  const savedDiff = lsGet(LS_DIFF, 'easy');
+  const S = {
+    phase: 'boot',                  // boot | menu | play | result | final
+    ready: false,
+    diffKey: DIFFS[savedDiff] ? savedDiff : 'easy',
+    D: null, G: null, rng: null, seed: 0, ch: null,
+    round: 0, score: 0, totalMs: 0, records: [],
+    pr: null, model: null, history: [],
+    color: 0, eraser: false,
+    roundAcc: 0, roundStart: 0, running: false, paused: false, lastSec: -1,
+    display: 'mine', marks: null, lastRes: null,
+    bigDir: 'F', confirmKind: null,
+    forcedSeed: null, forcedDiff: null,
+  };
+  const R = {
+    renderer: null, scene: null, camera: null, raycaster: null,
+    board: null, boardTrash: [], tiles: [], blockGroup: null, pool: [],
+    geo: {}, mats: [], edgeMat: null, ghost: null, ghostMat: null, eraseMat: null,
+    N: 3, H: 3, fit: 12, needs: true,
+    cam: { theta: DEFAULT_CAM.theta, phi: DEFAULT_CAM.phi, zoom: 1, target: null, anim: null, preset: null },
+  };
+  const ptr = { map: new Map(), downX: 0, downY: 0, lastX: 0, lastY: 0, dragging: false, tap: false, pinchD: 0, pinchZ: 1 };
+
+  // ---------- 작은 도구 ----------
+  function fmtClock(ms) { const s = Math.max(0, Math.round(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function fmtSec(sec) { return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+  function fmtScore(n) { return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0'; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function emptyModel(NN, H) { return { h: new Array(NN).fill(0), col: Array.from({ length: NN }, () => new Array(H).fill(-1)) }; }
+  function cloneModel(m) { return { h: m.h.slice(), col: m.col.map(a => a.slice()) }; }
+  function sameModel(a, b) {
+    for (let i = 0; i < a.h.length; i++) {
+      if (a.h[i] !== b.h[i]) return false;
+      for (let y = 0; y < a.h[i]; y++) if (a.col[i][y] !== b.col[i][y]) return false;
+    }
+    return true;
+  }
+  function withTimeout(p, ms) {
+    return new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error('timeout')), ms);
+      p.then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); });
+    });
+  }
+  let toastTimer = 0;
+  function toast(msg, ms) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms || 1300);
+  }
+  function shade(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const t = f < 0 ? 0 : 255, p = Math.abs(f);
+    r = Math.round((t - r) * p + r); g = Math.round((t - g) * p + g); b = Math.round((t - b) * p + b);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  // ---------- 시작 화면 ----------
+  function drawLogo() {
+    const s = 18, cubes = [[0, 0, 1, 2], [1, 0, 1, 4], [0, 0, 0, 3], [1, 0, 0, 0], [0, 1, 0, 1], [0, 2, 0, 5], [1, 1, 1, 2]];
+    const P = (x, y, z) => [(x - z) * 0.866 * s, (x + z) * 0.5 * s - y * s];
+    cubes.sort((a, b) => (a[0] + a[2]) - (b[0] + b[2]) || a[1] - b[1]);
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, body = '';
+    const poly = (pts, fill) => {
+      for (const [px, py] of pts) { minX = Math.min(minX, px); maxX = Math.max(maxX, px); minY = Math.min(minY, py); maxY = Math.max(maxY, py); }
+      body += `<polygon points="${pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="${fill}" stroke="#0c0d10" stroke-width="1.2" stroke-linejoin="round"/>`;
+    };
+    for (const [x, y, z, c] of cubes) {
+      const hex = COLORS[c].hex;
+      poly([P(x, y + 1, z), P(x + 1, y + 1, z), P(x + 1, y + 1, z + 1), P(x, y + 1, z + 1)], shade(hex, 0.22));
+      poly([P(x + 1, y, z), P(x + 1, y + 1, z), P(x + 1, y + 1, z + 1), P(x + 1, y, z + 1)], hex);
+      poly([P(x, y, z + 1), P(x + 1, y, z + 1), P(x + 1, y + 1, z + 1), P(x, y + 1, z + 1)], shade(hex, -0.28));
+    }
+    const pad = 2;
+    $('logo').innerHTML = `<svg viewBox="${(minX - pad).toFixed(1)} ${(minY - pad).toFixed(1)} ${(maxX - minX + 2 * pad).toFixed(1)} ${(maxY - minY + 2 * pad).toFixed(1)}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+  }
+  function bestOf(dk) {
+    const all = lsGet(LS_BEST, {});
+    const b = all && typeof all === 'object' ? all[dk] : null;
+    return b && typeof b.score === 'number' && typeof b.timeMs === 'number' ? b : null;
+  }
+  function renderDiffList() {
+    const host = $('diffList');
+    host.innerHTML = '';
+    for (const dk of DIFF_ORDER) {
+      const D = DIFFS[dk], b = bestOf(dk);
+      const el = document.createElement('button');
+      el.className = 'diff' + (dk === S.diffKey ? ' on' : '');
+      el.setAttribute('role', 'radio');
+      el.setAttribute('aria-checked', dk === S.diffKey ? 'true' : 'false');
+      el.dataset.dk = dk;
+      el.innerHTML = `<span class="dn">${D.label}</span><span class="ds">${D.N}×${D.N} · ${D.C}색 · ${D.timeSec / 60}분</span>` +
+        `<span class="db">${b ? '최고 ' + fmtScore(b.score) + ' · ' + fmtClock(b.timeMs) : '기록 없음'}</span>`;
+      host.appendChild(el);
+    }
+  }
+  function showMenu() {
+    S.phase = 'menu';
+    S.running = false;
+    closeAllOverlays();
+    renderDiffList();
+    $('finalScreen').hidden = true;
+    $('startScreen').hidden = false;
+  }
+  function setReady() {
+    S.ready = true;
+    const b = $('btnStart');
+    b.disabled = false;
+    b.textContent = '시작';
+  }
+
+  // ---------- 평면도 ----------
+  function viewCellPx(N, H) {
+    const w = $('app').clientWidth, hgt = window.innerHeight;
+    const avail = (w - 24 - 24) / 3;
+    const byW = Math.floor((avail - 2) / N) - 1;
+    const maxPicH = hgt < 640 ? 48 : hgt < 760 ? 62 : 74;
+    const byH = Math.floor(maxPicH / Math.max(N, H)) - 1;
+    return clamp(Math.min(byW, byH, 20), 7, 20);
+  }
+  function makePic(rows, cell, marks) {
+    const el = document.createElement('div');
+    el.className = 'pic';
+    el.style.gridTemplateColumns = `repeat(${rows[0].length}, ${cell}px)`;
+    el.style.gridAutoRows = cell + 'px';
+    for (const row of rows) for (const c of row) {
+      const px = document.createElement('div');
+      px.className = 'px';
+      if (c.c >= 0) px.style.background = COLORS[c.c].hex;
+      if (marks && marks.mut === c.key) px.classList.add('mk-mut');
+      else if (marks && marks.diff && marks.diff.has(c.key)) px.classList.add('mk-diff');
+      el.appendChild(px);
+    }
+    return el;
+  }
+  function renderViews() {
+    if (!S.pr || !S.G) return;
+    const cell = viewCellPx(S.G.N, S.G.H);
+    for (const d of ['F', 'T', 'B', 'L', 'R']) {
+      const host = $('v' + d);
+      host.innerHTML = '';
+      host.appendChild(makePic(L.viewGrid(S.G, S.pr.V, d), cell, S.marks));
+    }
+    $('viewsTotal').textContent = `총 ${S.pr.K}개`;
+  }
+  function openBig(d) {
+    if (!S.pr) return;
+    S.bigDir = d || 'F';
+    renderBig();
+    $('bigView').hidden = false;
+  }
+  function renderBig() {
+    const G = S.G, d = S.bigDir, rows = L.viewGrid(G, S.pr.V, d);
+    $('bigTitle').textContent = DIR_NAME[d] + ' 그림';
+    $('bigTotal').textContent = `총 ${S.pr.K}개`;
+    for (const b of $('bigTabs').children) b.classList.toggle('on', b.dataset.dir === d);
+    const w = Math.min($('app').clientWidth - 110, 270);
+    const cell = clamp(Math.floor(w / G.N) - 2, 18, 54);
+    const body = $('bigBody');
+    body.innerHTML = '';
+    const ax = DIR_AXES[d];
+    const cellEl = (cls, txt) => { const e = document.createElement('div'); e.className = cls; e.textContent = txt || ''; return e; };
+    // 1행
+    body.appendChild(cellEl(''));
+    body.appendChild(cellEl('big-axis', d === 'T' ? '뒤' : ''));
+    body.appendChild(cellEl(''));
+    // 2행
+    if (d === 'T') body.appendChild(cellEl('big-axis', ''));
+    else {
+      const fl = document.createElement('div');
+      fl.className = 'big-floors';
+      fl.style.gridTemplateRows = `repeat(${G.H}, ${cell + 1}px)`;
+      for (let r = 0; r < G.H; r++) fl.appendChild(cellEl('', (G.H - r) + '층'));
+      body.appendChild(fl);
+    }
+    body.appendChild(makePic(rows, cell, S.marks));
+    body.appendChild(cellEl(''));
+    // 3행
+    body.appendChild(cellEl(''));
+    const under = document.createElement('div');
+    under.className = 'big-under';
+    under.innerHTML = `<span>← ${ax[0]}</span>${d === 'T' ? '<span>앞</span>' : ''}<span>${ax[1]} →</span>`;
+    body.appendChild(under);
+    body.appendChild(cellEl(''));
+    const lg = $('bigLegend');
+    const parts = [];
+    if (S.marks && S.marks.mut) parts.push('<span><i style="box-shadow:0 0 0 2px var(--danger)"></i>바뀐 칸</span>');
+    if (S.marks && S.marks.diff && S.marks.diff.size) parts.push('<span><i style="box-shadow:0 0 0 2px var(--amber)"></i>내 모형과 다른 칸</span>');
+    lg.innerHTML = parts.join('');
+    lg.hidden = parts.length === 0;
+  }
+
+  // ---------- 3D ----------
+  function toWorld(x, y, z) {
+    // 모형 좌표 → Three.js 좌표. 변환은 오직 여기서만 한다.
+    const N = R.N;
+    return new THREE.Vector3(x - (N - 1) / 2, y + 0.5, (N - 1) / 2 - z);
+  }
+  function camPose(theta, phi, dist, target) {
+    const pos = new THREE.Vector3(), up = new THREE.Vector3();
+    if (phi < 1e-3) {           // 바로 위: up = (0,0,-1) (θ=0일 때)
+      pos.set(target.x, target.y + dist, target.z);
+      up.set(-Math.sin(theta), 0, -Math.cos(theta));
+    } else {
+      pos.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta));
+      up.set(0, 1, 0);
+    }
+    return { pos, up };
+  }
+  function applyCamera() {
+    const c = R.cam, p = camPose(c.theta, c.phi, R.fit * c.zoom, c.target);
+    R.camera.position.copy(p.pos);
+    R.camera.up.copy(p.up);
+    R.camera.lookAt(c.target);
+    R.needs = true;
+  }
+  function fitCamera() {
+    const N = R.N, H = R.H, w = N + 1.7;
+    const rad = Math.sqrt(2 * (w / 2) * (w / 2) + (H / 2) * (H / 2));
+    const vh = THREE.MathUtils.degToRad(R.camera.fov / 2);
+    const hh = Math.atan(Math.tan(vh) * R.camera.aspect);
+    R.fit = rad / Math.sin(Math.min(vh, hh)) * 1.0;
+    R.cam.target.set(0, H * 0.2, 0);
+    applyCamera();
+  }
+  function setPresetActive(key) {
+    R.cam.preset = key;
+    for (const b of $('camBtns').children) b.classList.toggle('on', b.dataset.preset === key);
+  }
+  function animateCam(theta, phi, ms) {
+    const c = R.cam;
+    let dt = theta - c.theta;
+    dt = ((dt + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    c.anim = { t0: performance.now(), ms: ms || 300, th0: c.theta, ph0: c.phi, th1: c.theta + dt, ph1: phi };
+    R.needs = true;
+  }
+  function resetCamera() {
+    R.cam.anim = null;
+    R.cam.theta = DEFAULT_CAM.theta;
+    R.cam.phi = DEFAULT_CAM.phi;
+    R.cam.zoom = 1;
+    setPresetActive(null);
+    applyCamera();
+  }
+  function makeLabel(text, mx, mz, rz) {
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 96;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#a6acb8';
+    g.font = '700 58px -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 128, 52);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    const geo = new THREE.PlaneGeometry(1.36, 0.51);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(toWorld(mx, -0.495, mz));
+    m.rotation.set(-Math.PI / 2, 0, rz);          // 판에 눕히고, 글자 위쪽이 판 가운데를 향하게
+    R.boardTrash.push(geo, mat, tex);
+    return m;
+  }
+  function disposeBoard() {
+    if (R.board) R.scene.remove(R.board);
+    for (const o of R.boardTrash) { try { o.dispose(); } catch (e) { /* 무시 */ } }
+    R.boardTrash = [];
+    R.tiles = [];
+    R.board = null;
+    if (R.blockGroup) R.blockGroup.clear();
+  }
+  function buildBoard(N, H) {
+    disposeBoard();
+    R.N = N; R.H = H;
+    const g = new THREE.Group();
+    const half = N / 2 + 0.85;
+    const slabGeo = new THREE.BoxGeometry(half * 2, 0.3, half * 2);
+    const slabMat = new THREE.MeshLambertMaterial({ color: 0x23262e });
+    const slab = new THREE.Mesh(slabGeo, slabMat);
+    slab.position.copy(toWorld((N - 1) / 2, -0.65, (N - 1) / 2));
+    g.add(slab);
+    const tileGeo = new THREE.PlaneGeometry(0.94, 0.94);
+    const tileMat = new THREE.MeshLambertMaterial({ color: 0x353a46 });
+    for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
+      const t = new THREE.Mesh(tileGeo, tileMat);
+      t.rotation.x = -Math.PI / 2;
+      t.position.copy(toWorld(x, -0.497, z));
+      t.userData = { x, z };
+      g.add(t);
+      R.tiles.push(t);
+    }
+    g.add(makeLabel('앞', (N - 1) / 2, -0.98, 0));
+    g.add(makeLabel('뒤', (N - 1) / 2, N - 1 + 0.98, Math.PI));
+    g.add(makeLabel('왼쪽', -0.98, (N - 1) / 2, -Math.PI / 2));
+    g.add(makeLabel('오른쪽', N - 1 + 0.98, (N - 1) / 2, Math.PI / 2));
+    R.boardTrash.push(slabGeo, slabMat, tileGeo, tileMat);
+    R.scene.add(g);
+    R.board = g;
+    fitCamera();
+  }
+  function poolMesh(k) {
+    if (!R.pool[k]) {
+      const m = new THREE.Mesh(R.geo.block, R.mats[0]);
+      m.add(new THREE.LineSegments(R.geo.edges, R.edgeMat));
+      R.pool[k] = m;
+    }
+    return R.pool[k];
+  }
+  function displayModel() {
+    if (S.phase === 'result' && S.display === 'answer' && S.pr && S.pr.model) return S.pr.model;
+    return S.model;
+  }
+  function syncBlocks() {
+    if (!R.renderer || !S.G) return;
+    const m = displayModel(), G = S.G;
+    R.blockGroup.clear();
+    if (!m) { R.needs = true; return; }
+    let k = 0;
+    for (let x = 0; x < G.N; x++) for (let z = 0; z < G.N; z++) {
+      const i = G.id(x, z);
+      for (let y = 0; y < m.h[i]; y++) {
+        const mesh = poolMesh(k++);
+        mesh.material = R.mats[m.col[i][y]];
+        mesh.position.copy(toWorld(x, y, z));
+        mesh.userData.x = x; mesh.userData.z = z; mesh.userData.y = y;
+        R.blockGroup.add(mesh);
+      }
+    }
+    R.needs = true;
+  }
+  function initThree() {
+    const cv = $('cv');
+    const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'low-power' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x111318, 1);
+    R.renderer = renderer;
+    R.scene = new THREE.Scene();
+    R.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+    // 옆면도 색이 또렷하게: 밝은 주변광 + 약한 반구광 + 위·앞쪽 방향광 (그림자 없음)
+    R.scene.add(new THREE.AmbientLight(0xffffff, 1.9));
+    R.scene.add(new THREE.HemisphereLight(0xffffff, 0x30343e, 0.5));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.2);
+    dl.position.set(2, 6, 4);
+    R.scene.add(dl);
+    R.raycaster = new THREE.Raycaster();
+    R.geo.block = new THREE.BoxGeometry(0.94, 0.94, 0.94);
+    R.geo.edges = new THREE.EdgesGeometry(R.geo.block);
+    R.mats = COLORS.map(c => new THREE.MeshLambertMaterial({ color: c.hex }));
+    R.edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+    R.ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
+    R.eraseMat = new THREE.MeshBasicMaterial({ color: 0xff5a5f, transparent: true, opacity: 0.45, depthWrite: false });
+    R.ghost = new THREE.Mesh(R.geo.block, R.ghostMat);
+    R.ghost.visible = false;
+    R.scene.add(R.ghost);
+    R.blockGroup = new THREE.Group();
+    R.scene.add(R.blockGroup);
+    R.cam.target = new THREE.Vector3();
+  }
+  function resize() {
+    if (!R.renderer) return;
+    const st = $('stage'), w = st.clientWidth, h = st.clientHeight;
+    if (!w || !h) return;
+    R.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    R.renderer.setSize(w, h, false);
+    R.camera.aspect = w / h;
+    R.camera.updateProjectionMatrix();
+    fitCamera();
+  }
+  function pickColumn(cx, cy) {
+    const rect = R.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
+    R.raycaster.setFromCamera(ndc, R.camera);
+    const hits = R.raycaster.intersectObjects(R.blockGroup.children.concat(R.tiles), false);
+    return hits.length ? { x: hits[0].object.userData.x, z: hits[0].object.userData.z } : null;
+  }
+  function hideGhost() { if (R.ghost && R.ghost.visible) { R.ghost.visible = false; R.needs = true; } }
+  function updateGhost(cx, cy) {
+    if (S.phase !== 'play' || S.paused) { hideGhost(); return; }
+    const col = pickColumn(cx, cy);
+    if (!col) { hideGhost(); return; }
+    const i = S.G.id(col.x, col.z), h = S.model.h[i];
+    if (S.eraser) {
+      if (h === 0) { hideGhost(); return; }
+      R.ghost.material = R.eraseMat;
+      R.ghost.scale.setScalar(1.06);
+      R.ghost.position.copy(toWorld(col.x, h - 1, col.z));
+    } else {
+      if (h >= S.D.H) { hideGhost(); return; }
+      R.ghostMat.color.set(COLORS[S.color].hex);
+      R.ghost.material = R.ghostMat;
+      R.ghost.scale.setScalar(1);
+      R.ghost.position.copy(toWorld(col.x, h, col.z));
+    }
+    R.ghost.visible = true;
+    R.needs = true;
+  }
+
+  // ---------- 쌓기·빼기 ----------
+  function placeAt(x, z) {
+    if (S.phase !== 'play' || S.paused) return;
+    const i = S.G.id(x, z), m = S.model;
+    if (S.eraser) {
+      if (m.h[i] === 0) return;
+      const y = m.h[i] - 1;
+      S.history.push({ t: 'rm', i, y, c: m.col[i][y] });
+      m.h[i]--;
+    } else {
+      if (m.h[i] >= S.D.H) { toast(`최대 ${S.D.H}층까지 쌓을 수 있어요`); return; }
+      m.col[i][m.h[i]] = S.color;
+      m.h[i]++;
+      S.history.push({ t: 'add', i });
+      if (!$('stageHint').hidden) { $('stageHint').hidden = true; lsSet(LS_HINT, true); }
+    }
+    if (S.history.length > 600) S.history.shift();
+    afterModelChange();
+  }
+  function undo() {
+    if (S.phase !== 'play' || S.paused) return;
+    const a = S.history.pop();
+    if (!a) return;
+    if (a.t === 'add') S.model.h[a.i]--;
+    else if (a.t === 'rm') { S.model.col[a.i][a.y] = a.c; S.model.h[a.i]++; }
+    else if (a.t === 'clear') S.model = a.prev;
+    afterModelChange();
+  }
+  function clearAll() {
+    if (S.phase !== 'play' || S.paused) return;
+    if (L.countBlocks(S.model.h) === 0) return;
+    S.history.push({ t: 'clear', prev: cloneModel(S.model) });
+    S.model = emptyModel(S.G.NN, S.D.H);
+    afterModelChange();
+    toast('비웠어요 · 되돌리기로 복구할 수 있어요');
+  }
+  function afterModelChange() {
+    syncBlocks();
+    updateCount();
+    hideGhost();
+  }
+  function updateCount() {
+    if (!S.pr) return;
+    const m = displayModel(), n = m ? L.countBlocks(m.h) : 0;
+    const pill = $('countPill');
+    pill.innerHTML = `현재 <b>${n}</b>개 / 총 ${S.pr.K}개`;
+    pill.classList.toggle('match', n === S.pr.K && S.phase === 'play');
+    $('btnBuild').classList.toggle('primary', S.phase === 'play' && n === S.pr.K);
+    $('btnUndo').disabled = S.history.length === 0 || S.phase !== 'play';
+    $('btnClear').disabled = n === 0 || S.phase !== 'play';
+  }
+  function buildPalette() {
+    const pal = $('palette');
+    pal.innerHTML = '';
+    for (let c = 0; c < S.D.C; c++) {
+      const b = document.createElement('button');
+      b.className = 'sw';
+      b.style.background = COLORS[c].hex;
+      b.dataset.c = String(c);
+      b.setAttribute('aria-label', COLORS[c].name);
+      b.title = `${COLORS[c].name} (${c + 1})`;
+      pal.appendChild(b);
+    }
+    const er = document.createElement('button');
+    er.className = 'sw sw-eraser';
+    er.dataset.eraser = '1';
+    er.textContent = '지우개';
+    er.title = '지우개 (E)';
+    pal.appendChild(er);
+    updatePaletteUI();
+  }
+  function updatePaletteUI() {
+    for (const b of $('palette').children) {
+      if (b.dataset.eraser) { b.classList.toggle('on', S.eraser); b.setAttribute('aria-pressed', S.eraser ? 'true' : 'false'); }
+      else b.classList.toggle('on', !S.eraser && Number(b.dataset.c) === S.color);
+    }
+  }
+  function selectColor(c) { if (c < 0 || c >= S.D.C) return; S.color = c; S.eraser = false; updatePaletteUI(); hideGhost(); }
+  function toggleEraser() { S.eraser = !S.eraser; updatePaletteUI(); hideGhost(); }
+
+  // ---------- 시간 ----------
+  function roundElapsed(now) { return S.roundAcc + (S.running ? now - S.roundStart : 0); }
+  function startTimer() { S.roundAcc = 0; S.roundStart = performance.now(); S.running = true; S.lastSec = -1; }
+  function pauseTimer() { if (!S.running) return; S.roundAcc += performance.now() - S.roundStart; S.running = false; }
+  function resumeTimer() { if (S.running) return; S.roundStart = performance.now(); S.running = true; S.lastSec = -1; }
+  function updateTimer(now) {
+    const limit = S.D.timeSec * 1000, left = Math.max(0, limit - roundElapsed(now));
+    const sec = Math.ceil(left / 1000);
+    if (sec !== S.lastSec) {
+      S.lastSec = sec;
+      const t = $('hudTime');
+      t.textContent = fmtSec(sec);
+      t.classList.toggle('warn', sec <= 20);
+      t.classList.toggle('urgent', sec <= 10 && sec > 0);
+    }
+    if (left <= 0 && S.running) endRound('timeout');
+  }
+
+  // ---------- 게임 진행 ----------
+  function updateHud() {
+    $('hudRound').innerHTML = `라운드 <b>${Math.min(S.round + 1, ROUNDS)}</b>/${ROUNDS}`;
+    $('hudScore').innerHTML = `점수 <b>${fmtScore(S.score)}</b>`;
+  }
+  function startGame(dk) {
+    if (!S.ready) return;
+    const D = DIFFS[dk] || DIFFS.easy;
+    S.diffKey = D.key;
+    lsSet(LS_DIFF, D.key);
+    S.D = D;
+    S.G = makeGame(D.N, D.H, D.C);                 // 난이도마다 새로 만든다
+    let seed = L.newSeed();
+    if (S.forcedSeed != null && (!S.forcedDiff || S.forcedDiff === D.key)) seed = S.forcedSeed;
+    S.forcedSeed = null;
+    S.seed = seed;
+    S.rng = L.mulberry32(seed);
+    S.ch = L.drawCharacter(D.key, S.rng);
+    S.round = 0; S.score = 0; S.totalMs = 0; S.records = [];
+    if (S.color >= D.C) S.color = 0;
+    S.eraser = false;
+    buildBoard(D.N, D.H);
+    buildPalette();
+    closeAllOverlays();
+    $('startScreen').hidden = true;
+    $('finalScreen').hidden = true;
+    startRound();
+  }
+  function startRound() {
+    const G = S.G, D = S.D;
+    S.pr = L.withRandom(S.rng, () => L.generateRound(G, D, S.diffKey, S.ch, S.round, S.rng));
+    S.model = emptyModel(G.NN, D.H);
+    S.history = [];
+    S.marks = null;
+    S.display = 'mine';
+    S.lastRes = null;
+    S.eraser = false;
+    updatePaletteUI();
+    $('playDock').hidden = false;
+    $('resultDock').hidden = true;
+    $('btnUndo').style.visibility = 'visible';
+    $('btnClear').style.visibility = 'visible';
+    S.phase = 'play';
+    S.paused = false;
+    renderViews();
+    syncBlocks();
+    updateCount();
+    updateHud();
+    resetCamera();
+    startTimer();
+    toast(`라운드 ${S.round + 1} / ${ROUNDS}`, 1100);
+    $('stageHint').hidden = !!lsGet(LS_HINT, false);
+  }
+  function askConfirm(kind) {
+    if (S.phase !== 'play' || S.paused) return;
+    S.confirmKind = kind;
+    const note = $('cfNote');
+    note.hidden = true;
+    if (kind === 'build') {
+      $('cfTitle').textContent = '이 모형으로 제출할까요?';
+      $('cfSub').textContent = '맞으면 +1, 틀리면 −1이에요.';
+      $('btnCfOk').textContent = '제출';
+      const n = L.countBlocks(S.model.h);
+      if (n !== S.pr.K) { note.textContent = `블록이 지금 ${n}개예요. 총 ${S.pr.K}개와 달라요.`; note.hidden = false; }
+    } else {
+      $('cfTitle').textContent = '불가능으로 선언할까요?';
+      $('cfSub').textContent = '맞으면 +2, 틀리면 −2예요.';
+      $('btnCfOk').textContent = '불가능 선언';
+    }
+    $('confirm').hidden = false;
+  }
+  function endRound(kind) {                    // build | impossible | giveup | timeout
+    if (S.phase !== 'play') return;
+    pauseTimer();
+    $('confirm').hidden = true;
+    $('pause').hidden = true;
+    S.paused = false;
+    const limit = S.D.timeSec * 1000;
+    const elapsed = kind === 'timeout' ? limit : Math.min(S.roundAcc, limit);
+    let res;
+    if (kind === 'timeout' || kind === 'giveup') res = { correct: null, delta: 0 };
+    else res = L.judge(S.G, S.pr, kind === 'impossible' ? 'impossible' : 'build', S.model);
+    S.score += res.delta;
+    S.totalMs += elapsed;
+    S.records.push({ kind, delta: res.delta, correct: res.correct, elapsed, possible: S.pr.possible, prKind: S.pr.kind });
+    S.lastRes = res;
+    S.phase = 'result';
+    hideGhost();
+    showRoundResult(kind, res);
+    updateHud();
+    if (res.delta !== 0) {
+      const b = $('hudScore').querySelector('b');
+      if (b) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+    }
+  }
+  function showRoundResult(kind, res) {
+    const pr = S.pr;
+    let verdict, cls;
+    if (kind === 'timeout') { verdict = '시간 종료'; cls = 'neutral'; }
+    else if (kind === 'giveup') { verdict = '포기'; cls = 'neutral'; }
+    else if (res.correct) { verdict = '정답'; cls = 'good'; }
+    else { verdict = '오답'; cls = 'bad'; }
+    $('rVerdict').textContent = verdict;
+    $('rVerdict').className = 'r-verdict ' + cls;
+    $('rDelta').textContent = res.delta === 0 ? '0점' : fmtScore(res.delta) + '점';
+    const KN = { shape: '모양이 안 맞아요', color: '색이 안 맞아요', count: '개수가 안 맞아요' };
+    $('rTruth').textContent = pr.possible ? '만들 수 있는 문제였어요' : '불가능한 문제였어요 · ' + KN[pr.kind];
+    let detail = '';
+    const mutName = pr.mark ? DIR_NAME[pr.mark.split(':')[0]] : '';
+    if (pr.kind === 'shape') detail = `'${mutName}' 그림의 빨간 테두리 칸 때문에 블록이 뜨거나 그림끼리 높이가 맞지 않아요.`;
+    else if (pr.kind === 'color') detail = `모양은 맞지만, '${mutName}' 그림의 빨간 테두리 칸 색까지 맞추는 배치는 없어요.`;
+    else if (pr.kind === 'count') detail = `이 평면도로는 ${pr.range[0] === pr.range[1] ? pr.range[0] : pr.range[0] + '~' + pr.range[1]}개만 가능해요. (제시된 개수 ${pr.K}개)`;
+    else if (kind === 'build' && !res.correct) {
+      const parts = [];
+      if (res.count !== pr.K) parts.push(`내 모형은 ${res.count}개였어요`);
+      if (res.diff && res.diff.length) parts.push(res.diff.length <= 6 ? `노란 테두리 ${res.diff.length}칸이 내 모형과 달라요` : `그림이 여러 곳(${res.diff.length}칸, 노란 테두리) 달라요`);
+      detail = parts.join(' · ') + '.';
+    } else if (kind === 'build' && res.correct && !sameModel(S.model, pr.model)) detail = '출제 모형과 모양은 달라도 조건을 모두 맞혔어요.';
+    else if (pr.possible) detail = '3D 판에 출제에 쓴 정답 모형을 보여줘요.';
+    $('rDetail').textContent = detail;
+    S.marks = {
+      mut: pr.mark || null,
+      diff: (kind === 'build' && pr.possible && res.diff && res.diff.length) ? new Set(res.diff) : null,
+    };
+    renderViews();
+    S.display = pr.possible ? 'answer' : 'mine';
+    $('rSeg').hidden = !pr.possible;
+    updateSeg();
+    syncBlocks();
+    updateCount();
+    $('btnNext').textContent = S.round >= ROUNDS - 1 ? '최종 결과' : '다음 라운드';
+    $('playDock').hidden = true;
+    $('resultDock').hidden = false;
+    $('btnUndo').style.visibility = 'hidden';
+    $('btnClear').style.visibility = 'hidden';
+    $('stageHint').hidden = true;
+  }
+  function updateSeg() {
+    for (const b of $('rSeg').children) b.classList.toggle('on', b.dataset.show === S.display);
+  }
+  function nextRound() {
+    if (S.phase !== 'result') return;
+    S.round++;
+    if (S.round >= ROUNDS) showFinal();
+    else startRound();
+  }
+  function showFinal() {
+    S.phase = 'final';
+    closeAllOverlays();
+    const D = S.D, rec = { score: S.score, timeMs: Math.round(S.totalMs), at: Date.now() };
+    const prev = bestOf(D.key);
+    const isNew = !prev || rec.score > prev.score || (rec.score === prev.score && rec.timeMs < prev.timeMs);
+    if (isNew) {
+      let all = lsGet(LS_BEST, {});
+      if (!all || typeof all !== 'object') all = {};
+      all[D.key] = rec;
+      lsSet(LS_BEST, all);
+    }
+    $('fDiff').textContent = `${D.label} · ${ROUNDS}라운드`;
+    $('fScore').textContent = fmtScore(S.score);
+    $('fTime').textContent = `총 ${fmtClock(S.totalMs)}`;
+    $('fBest').innerHTML = isNew ? '<span class="new">새 최고 기록!</span>' : `최고 기록 ${fmtScore(prev.score)} · ${fmtClock(prev.timeMs)}`;
+    const WHAT = { build: '정답 제출', impossible: '불가능 선언', giveup: '포기', timeout: '시간 종료' };
+    $('fRounds').innerHTML = S.records.map((r, i) => {
+      const truth = r.possible ? '가능' : '불가능';
+      const dc = r.delta > 0 ? 'pos' : r.delta < 0 ? 'neg' : 'zero';
+      return `<div class="fr"><span class="n">${i + 1}</span><span class="w">${WHAT[r.kind]} <span style="color:var(--faint)">· ${truth}</span></span>` +
+        `<span class="t">${fmtClock(r.elapsed)}</span><span class="d ${dc}">${fmtScore(r.delta)}</span></div>`;
+    }).join('');
+    $('fSeed').textContent = `seed ${S.seed.toString(16).padStart(8, '0')} · ${D.key}`;
+    $('finalScreen').hidden = false;
+  }
+  function quitToMenu() {
+    pauseTimer();
+    S.paused = false;
+    hideGhost();
+    showMenu();
+  }
+
+  // ---------- 오버레이 ----------
+  function closeAllOverlays() {
+    for (const id of ['confirm', 'pause', 'bigView', 'rules', 'settings', 'issues']) $(id).hidden = true;
+    disarmSettings();
+  }
+  function disarmSettings() {
+    for (const id of ['setQuit', 'setReset']) {
+      const b = $(id);
+      b.classList.remove('armed');
+      b.textContent = id === 'setQuit' ? '그만두고 처음으로' : '최고 기록 지우기';
+    }
+  }
+  function openSettings() {
+    disarmSettings();
+    $('setQuit').hidden = !(S.phase === 'play' || S.phase === 'result');
+    $('settings').hidden = false;
+  }
+  function pauseForHidden() {
+    if (S.phase === 'play' && S.running) {
+      pauseTimer();
+      S.paused = true;
+      hideGhost();
+      $('pause').hidden = false;
+    }
+  }
+
+  // ---------- 자가 테스트 ----------
+  function selfTestCamera() {
+    const fails = [], saveN = R.N;
+    R.N = 3;
+    try {
+      const target = new THREE.Vector3(0, 0.9, 0), d = 10, eps = 1e-6;
+      const o = toWorld(0, 0, 0);
+      const colDir = {          // 그림의 왼쪽 열 → 오른쪽 열 방향 (4-3 표)
+        front: toWorld(2, 0, 0).sub(o), back: o.clone().sub(toWorld(2, 0, 0)),
+        left: o.clone().sub(toWorld(0, 0, 2)), right: toWorld(0, 0, 2).sub(o), top: toWorld(2, 0, 0).sub(o),
+      };
+      const upDir = {           // 그림의 아랫줄 → 윗줄 방향
+        front: toWorld(0, 1, 0).sub(o), back: toWorld(0, 1, 0).sub(o), left: toWorld(0, 1, 0).sub(o),
+        right: toWorld(0, 1, 0).sub(o), top: toWorld(0, 0, 2).sub(o),
+      };
+      const table = {           // 4-4 표: 카메라 위치 부호와 up 벡터
+        front: (r, u) => Math.abs(r.x) < eps && r.y > 0 && r.z > 0 && u.equals(new THREE.Vector3(0, 1, 0)),
+        back:  (r, u) => Math.abs(r.x) < eps && r.y > 0 && r.z < 0 && u.equals(new THREE.Vector3(0, 1, 0)),
+        left:  (r, u) => r.x < 0 && r.y > 0 && Math.abs(r.z) < eps && u.equals(new THREE.Vector3(0, 1, 0)),
+        right: (r, u) => r.x > 0 && r.y > 0 && Math.abs(r.z) < eps && u.equals(new THREE.Vector3(0, 1, 0)),
+        top:   (r, u) => Math.abs(r.x) < eps && r.y > 0 && Math.abs(r.z) < eps && u.distanceTo(new THREE.Vector3(0, 0, -1)) < eps,
+      };
+      const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+      for (const key of Object.keys(PRESETS)) {
+        const p = PRESETS[key], pose = camPose(p.theta, p.phi, d, target);
+        const rel = pose.pos.clone().sub(target);
+        if (!table[key](rel, pose.up)) fails.push(`테스트4 '${p.label}' 시점 카메라가 4-4 표와 달라요`);
+        const fwd = target.clone().sub(pose.pos).normalize();
+        const right = new THREE.Vector3().crossVectors(fwd, pose.up);
+        if (!(right.dot(colDir[key]) > eps)) fails.push(`테스트4 '${p.label}' 시점: forward×up이 그림 열 방향과 반대예요`);
+        cam.position.copy(pose.pos); cam.up.copy(pose.up); cam.lookAt(target); cam.updateMatrixWorld(true);
+        const cr = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+        const cu = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+        if (!(cr.dot(colDir[key]) > eps)) fails.push(`테스트4 '${p.label}' 시점: 실제 화면 오른쪽이 그림 열 방향과 반대예요`);
+        if (!(cu.dot(upDir[key]) > eps)) fails.push(`테스트4 '${p.label}' 시점: 실제 화면 위쪽이 그림 윗줄 방향과 달라요`);
+      }
+    } catch (e) {
+      fails.push('테스트4 실행 오류: ' + (e && e.message));
+    } finally {
+      R.N = saveN;
+    }
+    return fails;
+  }
+  function runSelfTests() {
+    const fails = L.selfTestCore().concat(selfTestCamera());
+    for (const f of fails) {
+      console.warn('[브릭빌드 자가 테스트 실패] ' + f);   // 콘솔 출력은 자가 테스트 실패 때만
+      reportIssue('자가 테스트 실패: ' + f);
+    }
+    return fails;
+  }
+
+  // ---------- 매 프레임 ----------
+  function tick(now) {
+    const c = R.cam;
+    if (c.anim) {
+      const a = c.anim, k = Math.min(1, (now - a.t0) / a.ms), e = 1 - Math.pow(1 - k, 3);
+      c.theta = a.th0 + (a.th1 - a.th0) * e;
+      c.phi = a.ph0 + (a.ph1 - a.ph0) * e;
+      if (k >= 1) { c.anim = null; c.theta = Math.atan2(Math.sin(c.theta), Math.cos(c.theta)); c.phi = a.ph1; }
+      applyCamera();
+    }
+    if (S.phase === 'play' && S.running) updateTimer(now);
+    if (R.needs) { R.renderer.render(R.scene, R.camera); R.needs = false; }
+  }
+  function frame(now) {
+    try { tick(now); } catch (e) { reportIssue('오류(화면 갱신): ' + (e && e.message)); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- 이벤트 ----------
+  function bindMenuEvents() {
+    on($('diffList'), 'click', (e) => {
+      const b = e.target.closest('.diff');
+      if (!b) return;
+      S.diffKey = b.dataset.dk;
+      lsSet(LS_DIFF, S.diffKey);
+      renderDiffList();
+    });
+    on($('btnStart'), 'click', () => startGame(S.diffKey));
+    on($('btnRules'), 'click', () => { $('rules').hidden = false; });
+    on($('btnRulesClose'), 'click', () => { $('rules').hidden = true; });
+    on($('rules'), 'click', (e) => { if (e.target === $('rules')) $('rules').hidden = true; });
+    on($('btnAgain'), 'click', () => startGame(S.diffKey));
+    on($('btnToMenu'), 'click', () => showMenu());
+    on($('btnRetry'), 'click', () => location.reload());
+    on($('btnGear'), 'click', openSettings);
+    on($('btnGear2'), 'click', openSettings);
+    on($('settings'), 'click', (e) => { if (e.target === $('settings')) $('settings').hidden = true; });
+    on($('setRules'), 'click', () => { $('settings').hidden = true; $('rules').hidden = false; });
+    on($('setQuit'), 'click', () => {
+      const b = $('setQuit');
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 그만둬요'; return; }
+      $('settings').hidden = true;
+      quitToMenu();
+    });
+    on($('setReset'), 'click', () => {
+      const b = $('setReset');
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 지워요'; return; }
+      lsDel(LS_BEST);
+      $('settings').hidden = true;
+      if (S.phase === 'menu') renderDiffList();
+      toast('최고 기록을 지웠어요');
+    });
+    on($('issueDot'), 'click', () => { $('issues').hidden = false; });
+    on($('btnIssuesClose'), 'click', () => { $('issues').hidden = true; });
+  }
+  function bindPlayEvents() {
+    on($('palette'), 'click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.eraser) toggleEraser(); else selectColor(Number(b.dataset.c));
+    });
+    on($('btnUndo'), 'click', undo);
+    on($('btnClear'), 'click', clearAll);
+    on($('btnBuild'), 'click', () => askConfirm('build'));
+    on($('btnImpossible'), 'click', () => askConfirm('impossible'));
+    on($('btnGiveup'), 'click', () => endRound('giveup'));           // 포기는 확인 없이
+    on($('btnCfCancel'), 'click', () => { $('confirm').hidden = true; });
+    on($('btnCfOk'), 'click', () => { const k = S.confirmKind; $('confirm').hidden = true; if (k) endRound(k); });
+    on($('confirm'), 'click', (e) => { if (e.target === $('confirm')) $('confirm').hidden = true; });
+    on($('btnResume'), 'click', () => {
+      $('pause').hidden = true;
+      if (S.phase === 'play' && S.paused) { S.paused = false; resumeTimer(); }
+    });
+    on($('btnNext'), 'click', nextRound);
+    on($('rSeg'), 'click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || S.phase !== 'result') return;
+      S.display = b.dataset.show;
+      updateSeg();
+      syncBlocks();
+      updateCount();
+    });
+    on($('views'), 'click', (e) => {
+      const c = e.target.closest('.vcell');
+      openBig(c ? c.dataset.dir : 'F');
+    });
+    on($('bigTabs'), 'click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      S.bigDir = b.dataset.dir;
+      renderBig();
+    });
+    on($('btnBigClose'), 'click', () => { $('bigView').hidden = true; });
+    on($('bigView'), 'click', (e) => { if (e.target === $('bigView')) $('bigView').hidden = true; });
+    on($('camBtns'), 'click', (e) => {
+      const b = e.target.closest('.cam');
+      if (!b) return;
+      const p = PRESETS[b.dataset.preset];
+      animateCam(p.theta, p.phi, 320);
+      setPresetActive(b.dataset.preset);
+    });
+  }
+  function bindStageEvents() {
+    const cv = $('cv');
+    const dist2 = () => {
+      const a = Array.from(ptr.map.values());
+      return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+    };
+    on(cv, 'pointerdown', (e) => {
+      try { cv.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
+      ptr.map.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptr.map.size === 1) {
+        ptr.downX = ptr.lastX = e.clientX;
+        ptr.downY = ptr.lastY = e.clientY;
+        ptr.dragging = false;
+        ptr.tap = true;
+      } else {
+        ptr.tap = false;
+        if (ptr.map.size === 2) { ptr.pinchD = dist2(); ptr.pinchZ = R.cam.zoom; }
+      }
+    });
+    on(cv, 'pointermove', (e) => {
+      if (!ptr.map.has(e.pointerId)) {
+        if (e.pointerType === 'mouse') updateGhost(e.clientX, e.clientY);
+        return;
+      }
+      ptr.map.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptr.map.size >= 2) {
+        const d = dist2();
+        if (ptr.pinchD > 0 && d > 0) {
+          R.cam.zoom = clamp(ptr.pinchZ * ptr.pinchD / d, 0.55, 1.8);
+          R.cam.anim = null;
+          applyCamera();
+        }
+        return;
+      }
+      const thr = e.pointerType === 'mouse' ? 5 : 10;
+      if (!ptr.dragging && Math.hypot(e.clientX - ptr.downX, e.clientY - ptr.downY) > thr) {
+        ptr.dragging = true;
+        ptr.tap = false;
+        R.cam.anim = null;
+        hideGhost();
+        setPresetActive(null);
+      }
+      if (ptr.dragging) {
+        R.cam.theta -= (e.clientX - ptr.lastX) * 0.009;
+        R.cam.phi = clamp(R.cam.phi - (e.clientY - ptr.lastY) * 0.009, 0, 1.5);
+        applyCamera();
+      }
+      ptr.lastX = e.clientX;
+      ptr.lastY = e.clientY;
+    });
+    const up = (e) => {
+      const wasTap = e.type === 'pointerup' && ptr.tap && !ptr.dragging && ptr.map.size === 1 && ptr.map.has(e.pointerId);
+      ptr.map.delete(e.pointerId);
+      if (wasTap) {
+        const col = pickColumn(e.clientX, e.clientY);
+        if (col) placeAt(col.x, col.z);
+        if (e.pointerType === 'mouse') updateGhost(e.clientX, e.clientY);
+      }
+      if (ptr.map.size === 1) {                 // 두 손가락 중 하나만 뗀 경우: 남은 손가락으로 이어서 회전
+        const rest = ptr.map.values().next().value;
+        ptr.lastX = rest.x; ptr.lastY = rest.y;
+        ptr.downX = rest.x; ptr.downY = rest.y;
+        ptr.dragging = true;
+        ptr.tap = false;
+      } else if (ptr.map.size === 0) {
+        ptr.dragging = false;
+      }
+    };
+    on(cv, 'pointerup', up);
+    on(cv, 'pointercancel', up);
+    on(cv, 'pointerleave', (e) => { if (e.pointerType === 'mouse') hideGhost(); });
+    on(cv, 'wheel', (e) => {
+      e.preventDefault();
+      R.cam.zoom = clamp(R.cam.zoom * Math.exp(e.deltaY * 0.0012), 0.55, 1.8);
+      R.cam.anim = null;
+      applyCamera();
+    }, { passive: false });
+    on(cv, 'contextmenu', (e) => e.preventDefault());
+  }
+  function bindGlobalEvents() {
+    on(document, 'visibilitychange', () => { if (document.hidden) pauseForHidden(); });
+    on(document, 'keydown', (e) => {
+      if (e.key === 'Escape') {
+        for (const id of ['bigView', 'rules', 'settings', 'issues', 'confirm']) if (!$(id).hidden) { $(id).hidden = true; return; }
+        return;
+      }
+      if (!$('confirm').hidden) { if (e.key === 'Enter') { e.preventDefault(); $('btnCfOk').click(); } return; }
+      if (S.phase === 'menu' && e.key === 'Enter' && S.ready && $('rules').hidden && $('settings').hidden) { startGame(S.diffKey); return; }
+      if (S.phase === 'result' && e.key === 'Enter' && $('bigView').hidden) { nextRound(); return; }
+      if (S.phase !== 'play' || S.paused || e.metaKey && e.code !== 'KeyZ' || e.altKey) return;
+      const m = /^Digit([1-6])$/.exec(e.code);
+      if (m) { selectColor(Number(m[1]) - 1); return; }
+      if (e.code === 'KeyE') { toggleEraser(); return; }
+      if (e.code === 'KeyZ') { e.preventDefault(); undo(); }
+    });
+    // 확대·스크롤·더블탭 줌 막기 (스크롤 영역만 예외)
+    document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', (e) => {
+      if (!(e.target && e.target.closest && e.target.closest('.scroll'))) e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('error', (e) => reportIssue('오류: ' + (e && e.message)));
+    window.addEventListener('unhandledrejection', (e) => reportIssue('오류: ' + (e && e.reason && e.reason.message || e && e.reason)));
+    let rt = 0;
+    const onResize = safe(() => {
+      resize();
+      clearTimeout(rt);
+      rt = setTimeout(safe(() => { renderViews(); if (!$('bigView').hidden) renderBig(); }), 120);
+    });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    if (window.ResizeObserver) new ResizeObserver(safe(() => resize())).observe($('stage'));
+  }
+  function showOffline(title, body) {
+    S.phase = 'offline';
+    if (title) $('offTitle').textContent = title;
+    if (body) $('offBody').textContent = body;
+    $('startScreen').hidden = true;
+    $('offline').hidden = false;
+  }
+
+  // ---------- 시작 ----------
+  async function boot() {
+    drawLogo();
+    renderDiffList();
+    S.phase = 'menu';
+    bindMenuEvents();
+    try {
+      const qs = new URLSearchParams(location.search);   // 버그 재현용: ?seed=xxxxxxxx&lv=easy
+      const sd = qs.get('seed'), lv = qs.get('lv');
+      if (sd && /^[0-9a-fA-F]{1,8}$/.test(sd)) S.forcedSeed = parseInt(sd, 16) >>> 0;
+      if (lv && DIFFS[lv]) { S.forcedDiff = lv; S.diffKey = lv; renderDiffList(); }
+    } catch (e) { /* 무시 */ }
+    try {
+      THREE = await withTimeout(import(THREE_URL), 20000);
+    } catch (e) {
+      showOffline();
+      return;                               // CDN 실패: 아래 코드는 실행하지 않는다
+    }
+    try {
+      initThree();
+    } catch (e) {
+      showOffline('3D 화면을 열 수 없어요', '이 브라우저나 기기에서 3D(WebGL)를 쓸 수 없어요. 다른 브라우저로 열어 주세요.');
+      return;
+    }
+    bindPlayEvents();
+    bindStageEvents();
+    bindGlobalEvents();
+    buildBoard(3, 3);
+    resize();
+    runSelfTests();
+    requestAnimationFrame(frame);
+    setReady();
+  }
+  boot().catch((e) => reportIssue('시작 오류: ' + (e && e.message)));
+})();
+</script>
+</body>
+</html>
